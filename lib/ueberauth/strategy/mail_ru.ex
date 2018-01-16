@@ -28,6 +28,16 @@ defmodule Ueberauth.Strategy.MailRu do
       fetch_user(conn, token)
     end
   end
+
+  @doc """
+  Handles the callback from app with access_token.
+  """
+  def handle_callback!(%Plug.Conn{params: %{"access_token" => access_token}} = conn) do
+    client = Ueberauth.Strategy.MailRu.OAuth.client
+    token = OAuth2.AccessToken.new(access_token)
+    fetch_user(conn, token)
+  end
+
   def handle_callback!(conn) do
     set_errors!(conn, [error("missing_code", "No code received")])
   end
