@@ -3,9 +3,9 @@ defmodule Ueberauth.Strategy.MailRu.OAuth do
 
   @defaults [
     strategy: __MODULE__,
-    site: "http://www.appsmail.ru/platform/api",
-    authorize_url: "https://connect.mail.ru/oauth/authorize",
-    token_url: "https://connect.mail.ru/oauth/token"
+    site: "https://o2.mail.ru/docs/",
+    authorize_url: "https://o2.mail.ru/login",
+    token_url: "https://o2.mail.ru/token"
   ]
 
   def client(opts \\ []) do
@@ -42,25 +42,7 @@ defmodule Ueberauth.Strategy.MailRu.OAuth do
   end
 
   def get(conn, token) do
-    OAuth2.Client.get(client, "http://www.appsmail.ru/platform/api?#{user_query(conn, token)}")
+    query = token |> Map.take([:access_token]) |> URI.encode_query
+    OAuth2.Client.get(client, "https://o2.mail.ru/userinfo?#{query}")
   end
-
-  defp user_query(conn, token) do
-    access_token = Map.fetch!(token, :access_token)
-    config = Application.get_env(:ueberauth, Ueberauth.Strategy.MailRu.OAuth)
-    %{
-      app_id: Keyword.get(config, :client_id),
-      format: "json",
-      method: "users.getInfo",
-      secure: 1,
-      session_key: access_token
-    } |> sig(Keyword.get(config, :client_secret)) |> URI.encode_query
-  end
-
-  defp sig(params, client_secret) do
-    params_string = params |> URI.encode_query |> String.replace("&", "")
-    Map.put_new(params, :sig, md5(params_string <> client_secret))
-  end
-
-  defp md5(str), do: :crypto.hash(:md5, str) |> Base.encode16(case: :lower)
 end

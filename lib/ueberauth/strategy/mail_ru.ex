@@ -3,7 +3,7 @@ defmodule Ueberauth.Strategy.MailRu do
   mail.ru Strategy for Überauth.
   """
 
-  use Ueberauth.Strategy, default_scope: "", uid_field: :uid
+  use Ueberauth.Strategy, default_scope: "userinfo"
 
   alias Ueberauth.Auth.Credentials
   alias Ueberauth.Auth.Extra
@@ -11,9 +11,12 @@ defmodule Ueberauth.Strategy.MailRu do
 
   def handle_request!(conn) do
     scopes = conn.params["scope"] || option(conn, :default_scope)
+    config = Application.get_env(:ueberauth, Ueberauth.Strategy.MailRu.OAuth)
     opts =
       [scope: scopes]
       |> Keyword.put(:response_type, "code")
+      |> Keyword.put(:state, "oauth")
+      |> Keyword.put(:client_id, Keyword.get(config, :client_id))
       |> Keyword.put(:redirect_uri, callback_url(conn))
     redirect!(conn, Ueberauth.Strategy.MailRu.OAuth.authorize_url!(opts))
   end
@@ -44,26 +47,20 @@ defmodule Ueberauth.Strategy.MailRu do
 
   def info(conn) do
     user = conn.private.mail_ru_user
-    city = if user["location"]["city"]["name"], do: user["location"]["city"]["name"] <> ", "
     %Info{
       email: user["email"],
       first_name: user["first_name"],
-      image: user["pic_big"] || user["pic"],
+      image: user["image"],
       last_name: user["last_name"],
-      name: user["name"],
-      location: "#{city}#{user["location"]["country"]["name"]}",
-      urls: %{
-        mail_ru: user["link"]
-      }
+      name: user["name"]
     }
   end
 
   def uid(conn) do
-    uid_field =
-      conn
-      |> option(:uid_field)
-      |> to_string
-    conn.private.mail_ru_user[uid_field]
+    # NOTE: mail.ru have't uid, so need to improvise ¯\_(ツ)_/¯
+    %{"email" => email, "name" => name} = conn.private.mail_ru_user
+    uid_string = if email && name, do: email <> name, else: to_string(:os.system_time(:seconds))
+    md5(uid_string)
   end
 
   def extra(conn) do
@@ -96,9 +93,11 @@ defmodule Ueberauth.Strategy.MailRu do
       {:ok, %OAuth2.Response{status_code: 401, body: _body}} ->
         set_errors!(conn, [error("token", "unauthorized")])
       {:ok, %OAuth2.Response{status_code: status_code, body: user}} when status_code in 200..399 ->
-        put_private(conn, :mail_ru_user, List.first(user))
+        put_private(conn, :mail_ru_user, user)
       {:error, %OAuth2.Error{reason: reason}} ->
         set_errors!(conn, [error("OAuth2", reason)])
     end
   end
+
+  defp md5(str), do: :crypto.hash(:md5, str) |> Base.encode16(case: :lower)
 end
