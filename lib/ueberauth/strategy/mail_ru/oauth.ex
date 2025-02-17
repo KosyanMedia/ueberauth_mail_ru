@@ -10,10 +10,12 @@ defmodule Ueberauth.Strategy.MailRu.OAuth do
 
   def client(opts \\ []) do
     config = Application.get_env(:ueberauth, Ueberauth.Strategy.MailRu.OAuth)
+
     opts =
       @defaults
       |> Keyword.merge(config)
       |> Keyword.merge(opts)
+
     OAuth2.Client.new(opts)
   end
 
@@ -22,6 +24,7 @@ defmodule Ueberauth.Strategy.MailRu.OAuth do
     |> client
     |> OAuth2.Client.authorize_url!(params)
   end
+
   def authorize_url(client, params) do
     OAuth2.Strategy.AuthCode.authorize_url(client, params)
   end
@@ -31,8 +34,10 @@ defmodule Ueberauth.Strategy.MailRu.OAuth do
       opts
       |> client
       |> OAuth2.Client.get_token!(params)
+
     client.token
   end
+
   def get_token(client, params, headers) do
     client
     |> put_param("client_secret", client.client_secret)
@@ -42,7 +47,7 @@ defmodule Ueberauth.Strategy.MailRu.OAuth do
   end
 
   def get(conn, token) do
-    query = token |> Map.take([:access_token]) |> URI.encode_query
-    OAuth2.Client.get(client, "https://o2.mail.ru/userinfo?#{query}")
+    query = token |> Map.take([:access_token]) |> URI.encode_query()
+    OAuth2.Client.get(client(), "https://o2.mail.ru/userinfo?#{query}")
   end
 end
